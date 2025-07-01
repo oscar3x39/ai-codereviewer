@@ -12183,10 +12183,11 @@ function getAIResponse(prompt) {
                     },
                 ] }));
             const res = ((_b = (_a = response.choices[0].message) === null || _a === void 0 ? void 0 : _a.content) === null || _b === void 0 ? void 0 : _b.trim()) || "{}";
+            core.info(`Original OpenAI response: ${res}`);
             return JSON.parse(res).reviews;
         }
         catch (error) {
-            console.error("Error:", error);
+            core.setFailed(`Failed to parse OpenAI response: ${error}`);
             return null;
         }
     });

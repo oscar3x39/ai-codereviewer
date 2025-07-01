@@ -152,9 +152,10 @@ async function getAIResponse(prompt: string): Promise<Array<{
     });
 
     const res = response.choices[0].message?.content?.trim() || "{}";
+    core.info(`Original OpenAI response: ${res}`);
     return JSON.parse(res).reviews;
   } catch (error) {
-    console.error("Error:", error);
+    core.setFailed(`Failed to parse OpenAI response: ${error}`);
     return null;
   }
 }

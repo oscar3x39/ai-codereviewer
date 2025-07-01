@@ -97,7 +97,9 @@ function createPrompt(
 - IMPORTANT: Do not suggest adding comments to the code.
 - IMPORTANT: All review comments must be written in ${LANGUAGE}.`;
 
-  const rules = customRules || defaultRules;
+  const rules = customRules
+    ? `${customRules}\n\n${defaultRules}`
+    : defaultRules;
 
   return `${rules}
 

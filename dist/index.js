@@ -12141,7 +12141,9 @@ function createPrompt(file, chunk, prDetails, customRules) {
 - Use the given description of the pull request for context, but only comment on the code.
 - IMPORTANT: Do not suggest adding comments to the code.
 - IMPORTANT: All review comments must be written in ${LANGUAGE}.`;
-    const rules = customRules || defaultRules;
+    const rules = customRules
+        ? `${customRules}\n\n${defaultRules}`
+        : defaultRules;
     return `${rules}
 
 Review the following code diff in the file "${file.to}" and take the pull request title and description into account when writing the response.

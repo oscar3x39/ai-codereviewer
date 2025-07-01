@@ -1,35 +1,40 @@
 # AI Code Reviewer
 
-AI Code Reviewer is a GitHub Action that leverages OpenAI's GPT-4 API to provide intelligent feedback and suggestions on
-your pull requests. This powerful tool helps improve code quality and saves developers time by automating the code
-review process.
+This GitHub Action performs code reviews on pull requests using the OpenAI API. It analyzes the diff of the pull request and posts comments with suggestions for improvement.
 
 ## Features
 
-- Reviews pull requests using OpenAI's GPT-4 API.
-- Provides intelligent comments and suggestions for improving your code.
-- Filters out files that match specified exclude patterns.
-- Easy to set up and integrate into your GitHub workflow.
+-   **Automated Code Reviews**: Get instant feedback on your pull requests.
+-   **Customizable Rules**: Define your own review rules in a separate file.
+-   **Multi-language Support**: Configure the language of the review comments.
+-   **File Exclusion**: Exclude specific files or directories from the review using glob patterns.
 
-## Setup
+## Inputs
 
-1. To use this GitHub Action, you need an OpenAI API key. If you don't have one, sign up for an API key
-   at [OpenAI](https://beta.openai.com/signup).
+| Name                  | Description                                                                                         | Required | Default   |
+| --------------------- | --------------------------------------------------------------------------------------------------- | -------- | --------- |
+| `GITHUB_TOKEN`        | Your GitHub token to interact with the repository. Usually `${{ secrets.GITHUB_TOKEN }}`.            | `true`   |           |
+| `OPENAI_API_KEY`      | Your OpenAI API key.                                                                                | `true`   |           |
+| `OPENAI_API_MODEL`    | The OpenAI model to use for the review.                                                             | `false`  | `gpt-4`   |
+| `language`            | The language for the AI's review comments. e.g., 'Traditional Chinese', 'English', 'Japanese'.        | `false`  | `English` |
+| `custom_rules_path`   | Path to a `.md` file with custom review rules to override the default instructions.                   | `false`  | `''`      |
+| `exclude`             | A comma-separated list of glob patterns to exclude files from the review. e.g., `dist,**/*.test.js`. | `false`  | `''`      |
 
-2. Add the OpenAI API key as a GitHub Secret in your repository with the name `OPENAI_API_KEY`. You can find more
-   information about GitHub Secrets [here](https://docs.github.com/en/actions/reference/encrypted-secrets).
+## Usage
 
-3. Create a `.github/workflows/main.yml` file in your repository and add the following content:
+Create a workflow file (e.g., `.github/workflows/ai-review.yml`) in your repository with the following content:
 
 ```yaml
-name: AI Code Reviewer
+name: AI Code Review
 
 on:
   pull_request:
-    types:
-      - opened
-      - synchronize
-permissions: write-all
+    types: [opened, synchronize]
+
+permissions:
+  pull-requests: write
+  contents: read
+
 jobs:
   review:
     runs-on: ubuntu-latest
@@ -38,32 +43,40 @@ jobs:
         uses: actions/checkout@v3
 
       - name: AI Code Reviewer
-        uses: your-username/ai-code-reviewer@main
+        uses: oscar3x39/ai-codereviewer@main
         with:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # The GITHUB_TOKEN is there by default so you just need to keep it like it is and not necessarily need to add it as secret as it will throw an error. [More Details](https://docs.github.com/en/actions/security-guides/automatic-token-authentication#about-the-github_token-secret)
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-          OPENAI_API_MODEL: "gpt-4" # Optional: defaults to "gpt-4"
-          exclude: "**/*.json, **/*.md" # Optional: exclude patterns separated by commas
+          OPENAI_API_MODEL: 'gpt-4'
+          language: 'Traditional Chinese'
+          exclude: "**/*.json, **/*.md"
+          custom_rules_path: '.github/ai-review-rules.md'
 ```
 
-4. Replace `your-username` with your GitHub username or organization name where the AI Code Reviewer repository is
-   located.
+## Custom Rules Example
 
-5. Customize the `exclude` input if you want to ignore certain file patterns from being reviewed.
+You can provide a custom rules file to the AI to guide its review process. Here is an example of what you could put in your `.github/ai-review-rules.md` file:
 
-6. Commit the changes to your repository, and AI Code Reviewer will start working on your future pull requests.
+```markdown
+# AI Review Rules
 
-## How It Works
+You are a senior software engineer responsible for maintaining high code quality.
 
-The AI Code Reviewer GitHub Action retrieves the pull request diff, filters out excluded files, and sends code chunks to
-the OpenAI API. It then generates review comments based on the AI's response and adds them to the pull request.
+## Core Directives
+- **All review comments MUST be written in Traditional Chinese.**
+- Your tone should be constructive, professional, and helpful.
+- For every piece of feedback, briefly explain the "why" behind your suggestion.
+
+## Technical Checks
+- **Security**: Look for hardcoded API keys, secrets, or potential injection vulnerabilities.
+- **Readability**: Identify overly complex logic that could be simplified.
+- **Best Practices**: Ensure the code follows common design patterns and best practices for the language.
+- **No Magic Numbers**: All constant values should be defined as named constants.
+```
 
 ## Contributing
 
-Contributions are welcome! Please feel free to submit issues or pull requests to improve the AI Code Reviewer GitHub
-Action.
-
-Let the maintainer generate the final package (`yarn build` & `yarn package`).
+Contributions are welcome! Please feel free to submit a pull request or open an issue.
 
 ## License
 

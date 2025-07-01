@@ -1,13 +1,15 @@
-import { readFileSync } from "fs";
-import * as core from "@actions/core";
-import OpenAI from "openai";
 import { Octokit } from "@octokit/rest";
+import * as core from "@actions/core";
+import { readFileSync } from "fs";
+import OpenAI from "openai";
 import parseDiff, { Chunk, File } from "parse-diff";
 import minimatch from "minimatch";
 
 const GITHUB_TOKEN: string = core.getInput("GITHUB_TOKEN");
 const OPENAI_API_KEY: string = core.getInput("OPENAI_API_KEY");
 const OPENAI_API_MODEL: string = core.getInput("OPENAI_API_MODEL");
+const LANGUAGE: string = core.getInput("language");
+const CUSTOM_RULES_PATH: string = core.getInput("custom_rules_path");
 
 const octokit = new Octokit({ auth: GITHUB_TOKEN });
 
@@ -36,8 +38,8 @@ async function getPRDetails(): Promise<PRDetails> {
     owner: repository.owner.login,
     repo: repository.name,
     pull_number: number,
-    title: prResponse.data.title ?? "",
-    description: prResponse.data.body ?? "",
+    title: prResponse.data.title,
+    description: prResponse.data.body || "",
   };
 }
 
@@ -58,14 +60,15 @@ async function getDiff(
 
 async function analyzeCode(
   parsedDiff: File[],
-  prDetails: PRDetails
+  prDetails: PRDetails,
+  customRules: string | null
 ): Promise<Array<{ body: string; path: string; line: number }>> {
   const comments: Array<{ body: string; path: string; line: number }> = [];
 
   for (const file of parsedDiff) {
     if (file.to === "/dev/null") continue; // Ignore deleted files
     for (const chunk of file.chunks) {
-      const prompt = createPrompt(file, chunk, prDetails);
+      const prompt = createPrompt(file, chunk, prDetails, customRules);
       const aiResponse = await getAIResponse(prompt);
       if (aiResponse) {
         const newComments = createComment(file, chunk, aiResponse);
@@ -78,14 +81,25 @@ async function analyzeCode(
   return comments;
 }
 
-function createPrompt(file: File, chunk: Chunk, prDetails: PRDetails): string {
-  return `Your task is to review pull requests. Instructions:
-- Provide the response in following JSON format:  {"reviews": [{"lineNumber":  <line_number>, "reviewComment": "<review comment>"}]}
+function createPrompt(
+  file: File,
+  chunk: Chunk,
+  prDetails: PRDetails,
+  customRules: string | null
+): string {
+  const defaultRules = `Your task is to review pull requests. Instructions:
+- Provide the response in a JSON format. The JSON object should have a single key called "reviews", which is an array of objects. Each object in the array should have two keys: "lineNumber" and "reviewComment".
 - Do not give positive comments or compliments.
-- Provide comments and suggestions ONLY if there is something to improve, otherwise "reviews" should be an empty array.
-- Write the comment in GitHub Markdown format.
-- Use the given description only for the overall context and only comment the code.
-- IMPORTANT: NEVER suggest adding comments to the code.
+- Provide comments and suggestions ONLY when you see something to improve, otherwise "reviews" in the JSON object should be an empty array.
+- The "lineNumber" in the JSON object should be the line number in the diff that the comment is about.
+- Write the review comments in GitHub Markdown format.
+- Use the given description of the pull request for context, but only comment on the code.
+- IMPORTANT: Do not suggest adding comments to the code.
+- IMPORTANT: All review comments must be written in ${LANGUAGE}.`;
+
+  const rules = customRules || defaultRules;
+
+  return `${rules}
 
 Review the following code diff in the file "${
     file.to
@@ -102,11 +116,10 @@ Git diff to review:
 
 \`\`\`diff
 ${chunk.content}
-${chunk.changes
+${
   // @ts-expect-error - ln and ln2 exists where needed
-  .map((c) => `${c.ln ? c.ln : c.ln2} ${c.content}`)
-  .join("\n")}
-\`\`\`
+  chunk.changes.map((c) => `${c.ln ? c.ln : c.ln2} ${c.content}`).join("\n")
+}\`\`\`
 `;
 }
 
@@ -154,16 +167,16 @@ function createComment(
     reviewComment: string;
   }>
 ): Array<{ body: string; path: string; line: number }> {
-  return aiResponses.flatMap((aiResponse) => {
-    if (!file.to) {
-      return [];
-    }
-    return {
+  const comments: Array<{ body: string; path: string; line: number }> = [];
+  for (const aiResponse of aiResponses) {
+    if (!file.to) continue;
+    comments.push({
       body: aiResponse.reviewComment,
       path: file.to,
       line: Number(aiResponse.lineNumber),
-    };
-  });
+    });
+  }
+  return comments;
 }
 
 async function createReviewComment(
@@ -232,7 +245,22 @@ async function main() {
     );
   });
 
-  const comments = await analyzeCode(filteredDiff, prDetails);
+  if (filteredDiff.length === 0) {
+    return;
+  }
+
+  let customRules: string | null = null;
+  if (CUSTOM_RULES_PATH) {
+    try {
+      customRules = readFileSync(CUSTOM_RULES_PATH, "utf8");
+    } catch (error) {
+      core.warning(
+        `Could not read custom rules file at ${CUSTOM_RULES_PATH}. Using default rules.`
+      );
+    }
+  }
+
+  const comments = await analyzeCode(filteredDiff, prDetails, customRules);
   if (comments.length > 0) {
     await createReviewComment(
       prDetails.owner,

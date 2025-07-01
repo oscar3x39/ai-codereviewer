@@ -11,6 +11,9 @@ inputs:
     description: "OpenAI API model."
     required: false
     default: "gpt-4"
+  custom_rules_path:
+    description: "Path to custom rules file. e.g., '.github/ai-review-rules.md'"
+    required: false
   language:
     description: "The language for the AI's review comments. e.g., 'Traditional Chinese', 'English', 'Japanese'."
     required: false

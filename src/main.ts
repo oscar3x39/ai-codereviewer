@@ -3,7 +3,7 @@ import * as core from "@actions/core";
 import { readFileSync } from "fs";
 import OpenAI from "openai";
 import parseDiff, { Chunk, File } from "parse-diff";
-import minimatch from "minimatch";
+import { minimatch } from "minimatch";
 
 const GITHUB_TOKEN: string = core.getInput("GITHUB_TOKEN");
 const OPENAI_API_KEY: string = core.getInput("OPENAI_API_KEY");
@@ -255,12 +255,13 @@ async function main() {
       customRules = readFileSync(CUSTOM_RULES_PATH, "utf8");
     } catch (error) {
       core.warning(
-        `Could not read custom rules file at ${CUSTOM_RULES_PATH}. Using default rules.`
+        `Could not read custom rules file at ${CUSTOM_RULES_PATH}. Continuing with default rules.`
       );
     }
   }
 
   const comments = await analyzeCode(filteredDiff, prDetails, customRules);
+
   if (comments.length > 0) {
     await createReviewComment(
       prDetails.owner,
@@ -273,5 +274,5 @@ async function main() {
 
 main().catch((error) => {
   console.error("Error:", error);
-  process.exit(1);
+  core.setFailed(error.message);
 });
